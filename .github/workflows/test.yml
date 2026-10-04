@@ -1,0 +1,146 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-unit:
+    name: Lint & unit tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: ShellCheck
+        if: runner.os == 'Linux'
+        run: shellcheck -x scripts/check.sh tests/*.sh
+      - name: Unit tests (tests/run-tests.sh)
+        run: bash tests/run-tests.sh
+
+  action:
+    name: Run action against fixtures (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Build fixture repositories
+        run: bash tests/make-fixtures.sh "$RUNNER_TEMP/fx"
+
+      # ---- passing exercise --------------------------------------------------
+      - name: Check passing exercise
+        id: pass
+        uses: ./
+        with:
+          working-directory: ${{ runner.temp }}/fx/pass
+          required-files: |
+            README.md
+            src/hello.sh
+          min-commits: 3
+          required-branches: main, feature/greeting
+          commit-message-pattern: '^(feat|fix|docs|chore)(\(.+\))?: .+'
+          forbid-files: '*.log, node_modules/'
+          require-gitignore: true
+
+      - name: Assert passing exercise
+        env:
+          RESULT: ${{ steps.pass.outputs.result }}
+          PASSED: ${{ steps.pass.outputs.passed }}
+          TOTAL: ${{ steps.pass.outputs.total }}
+          SCORE: ${{ steps.pass.outputs.score }}
+        run: |
+          echo "result=$RESULT passed=$PASSED total=$TOTAL score=$SCORE"
+          test "$RESULT" = pass
+          test "$PASSED/$TOTAL/$SCORE" = "9/9/100"
+
+      # ---- failing exercise, reported but not failing the job ----------------
+      - name: Check failing exercise (fail-on-error false)
+        id: fail
+        uses: ./
+        with:
+          working-directory: ${{ runner.temp }}/fx/fail
+          required-files: README.md, src/hello.sh
+          min-commits: 3
+          required-branches: main, feature/greeting
+          commit-message-pattern: '^(feat|fix|docs|chore)(\(.+\))?: .+'
+          forbid-files: '*.log, node_modules/'
+          require-gitignore: true
+          fail-on-error: false
+
+      - name: Assert failing exercise
+        env:
+          RESULT: ${{ steps.fail.outputs.result }}
+          PASSED: ${{ steps.fail.outputs.passed }}
+          TOTAL: ${{ steps.fail.outputs.total }}
+          SCORE: ${{ steps.fail.outputs.score }}
+        run: |
+          echo "result=$RESULT passed=$PASSED total=$TOTAL score=$SCORE"
+          test "$RESULT" = fail
+          test "$PASSED/$TOTAL/$SCORE" = "1/9/11"
+
+      # ---- failing exercise must fail the step by default --------------------
+      - name: Check failing exercise (fail-on-error default)
+        id: strict
+        continue-on-error: true
+        uses: ./
+        with:
+          working-directory: ${{ runner.temp }}/fx/fail
+          required-files: README.md
+
+      - name: Assert the step failed
+        env:
+          OUTCOME: ${{ steps.strict.outcome }}
+          RESULT: ${{ steps.strict.outputs.result }}
+        run: |
+          echo "outcome=$OUTCOME result=$RESULT"
+          test "$OUTCOME" = failure
+          test "$RESULT" = fail
+
+      # ---- configuration from .consensus-lab.yml ------------------------------
+      - name: Check exercise configured via .consensus-lab.yml
+        id: config
+        uses: ./
+        with:
+          working-directory: ${{ runner.temp }}/fx/config
+
+      - name: Assert config exercise
+        env:
+          RESULT: ${{ steps.config.outputs.result }}
+          TOTAL: ${{ steps.config.outputs.total }}
+        run: |
+          test "$RESULT" = pass
+          test "$TOTAL" = 9
+
+      # ---- shallow clone must warn, not crash ---------------------------------
+      - name: Check shallow clone
+        id: shallow
+        uses: ./
+        with:
+          working-directory: ${{ runner.temp }}/fx/shallow
+          fail-on-error: false
+
+      - name: Assert shallow clone still produced a result
+        env:
+          RESULT: ${{ steps.shallow.outputs.result }}
+        run: test "$RESULT" = pass
+
+      # ---- dogfooding: check this repository itself ---------------------------
+      - name: Check this repository
+        uses: ./
+        with:
+          required-files: action.yml, README.md, LICENSE, CHANGELOG.md, scripts/check.sh
+          forbid-files: '*.log, node_modules/, .env'
+          require-gitignore: true

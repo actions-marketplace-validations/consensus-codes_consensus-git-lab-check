@@ -1,0 +1,76 @@
+name: 'Consensus Git Lab Check'
+description: 'Auto-check Git/GitHub exercises (files, commits, branches, messages, .gitignore) and score them. A free autograder.'
+author: 'Consensus'
+
+branding:
+  icon: 'check-circle'
+  color: 'purple'
+
+inputs:
+  required-files:
+    description: 'Paths that must exist, separated by newlines or commas (e.g. "README.md, src/main.sh").'
+    required: false
+    default: ''
+  min-commits:
+    description: 'Minimum number of commits reachable from HEAD. Built-in default: 1 (0 disables the check).'
+    required: false
+    default: ''
+  required-branches:
+    description: 'Branches that must exist locally or on a remote, separated by newlines or commas.'
+    required: false
+    default: ''
+  commit-message-pattern:
+    description: 'POSIX extended regex that the subject of every non-merge commit must match. Empty = skip.'
+    required: false
+    default: ''
+  forbid-files:
+    description: 'Patterns that no tracked file may match, e.g. "*.log, node_modules/, .env".'
+    required: false
+    default: ''
+  require-gitignore:
+    description: 'Require a committed, non-empty .gitignore at the repository root (true/false). Built-in default: false.'
+    required: false
+    default: ''
+  config:
+    description: 'Path to a .consensus-lab.yml config file. Default: use .consensus-lab.yml if it exists. Inputs override config values.'
+    required: false
+    default: ''
+  fail-on-error:
+    description: 'Fail the step when any check fails (true/false). Built-in default: true.'
+    required: false
+    default: ''
+  working-directory:
+    description: 'Directory of the repository to check (relative to the workspace, or absolute).'
+    required: false
+    default: '.'
+
+outputs:
+  passed:
+    description: 'Number of checks that passed.'
+    value: ${{ steps.check.outputs.passed }}
+  total:
+    description: 'Total number of checks that ran.'
+    value: ${{ steps.check.outputs.total }}
+  score:
+    description: 'Percentage of checks that passed (integer 0-100).'
+    value: ${{ steps.check.outputs.score }}
+  result:
+    description: '"pass" if every check passed, otherwise "fail".'
+    value: ${{ steps.check.outputs.result }}
+
+runs:
+  using: 'composite'
+  steps:
+    - id: check
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        INPUT_REQUIRED_FILES: ${{ inputs.required-files }}
+        INPUT_MIN_COMMITS: ${{ inputs.min-commits }}
+        INPUT_REQUIRED_BRANCHES: ${{ inputs.required-branches }}
+        INPUT_COMMIT_MESSAGE_PATTERN: ${{ inputs.commit-message-pattern }}
+        INPUT_FORBID_FILES: ${{ inputs.forbid-files }}
+        INPUT_REQUIRE_GITIGNORE: ${{ inputs.require-gitignore }}
+        INPUT_CONFIG: ${{ inputs.config }}
+        INPUT_FAIL_ON_ERROR: ${{ inputs.fail-on-error }}
+      run: bash "$GITHUB_ACTION_PATH/scripts/check.sh"

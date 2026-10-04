@@ -1,0 +1,37 @@
+# .consensus-lab.yml - configuration for Consensus Git Lab Check
+# https://github.com/consensus-codes/consensus-git-lab-check
+#
+# Put this file in the root of the exercise repository (or point the
+# `config` input at it). Every key is optional. Values set as action inputs
+# in the workflow override the values below.
+
+# Files or directories that must exist.
+required-files:
+  - README.md
+  - scripts/backup.sh
+  - docs/
+
+# Minimum number of commits reachable from HEAD (0 disables the check).
+min-commits: 5
+
+# Branches that must exist (locally or as origin/<branch>).
+required-branches: [main, feature/backup-script]
+
+# POSIX extended regex every non-merge commit subject must match.
+# Use [0-9] rather than \d. Quote the value.
+commit-message-pattern: '^(feat|fix|docs|refactor|test|chore)(\([a-z0-9-]+\))?: .{3,}'
+
+# Nothing matching these patterns may be committed.
+#   *.log        -> any file named *.log, at any depth
+#   node_modules/-> any directory called node_modules
+#   build/out/   -> exactly that directory
+forbid-files:
+  - "*.log"
+  - node_modules/
+  - .env
+
+# Require a committed, non-empty .gitignore at the repository root.
+require-gitignore: true
+
+# Fail the workflow when a check fails (set false to only report a score).
+fail-on-error: true

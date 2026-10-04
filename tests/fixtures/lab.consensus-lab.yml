@@ -1,0 +1,9 @@
+# Fixture config used by tests/make-fixtures.sh (copied in as .consensus-lab.yml)
+required-files:
+  - README.md
+  - "src/hello.sh"
+min-commits: 3            # at least three commits
+required_branches: [main, 'feature/greeting']
+commit-message-pattern: '^(feat|fix|docs|chore)(\(.+\))?: .+'
+forbid-files: ["*.log", node_modules/]
+require-gitignore: yes

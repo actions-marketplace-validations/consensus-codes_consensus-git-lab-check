@@ -1,0 +1,45 @@
+# Copy to .github/workflows/lab-check.yml in an exercise (template) repository.
+name: Lab check
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0   # full history: needed for commit and branch checks
+
+      - id: lab
+        uses: consensus-codes/consensus-git-lab-check@v1
+        with:
+          fail-on-error: false   # always record a score; see result below
+
+      - name: Save score
+        if: always()
+        env:
+          PASSED: ${{ steps.lab.outputs.passed }}
+          TOTAL: ${{ steps.lab.outputs.total }}
+          SCORE: ${{ steps.lab.outputs.score }}
+          RESULT: ${{ steps.lab.outputs.result }}
+        run: |
+          printf '{"repo":"%s","sha":"%s","passed":%s,"total":%s,"score":%s,"result":"%s"}\n' \
+            "$GITHUB_REPOSITORY" "$GITHUB_SHA" "$PASSED" "$TOTAL" "$SCORE" "$RESULT" > lab-score.json
+          cat lab-score.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lab-score
+          path: lab-score.json
+
+      - name: Fail if not all checks passed
+        if: steps.lab.outputs.result != 'pass'
+        run: exit 1
